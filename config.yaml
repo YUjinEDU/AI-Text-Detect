@@ -1,13 +1,11 @@
-
 ---
 
-## ⚙️ config.yaml
+## ⚙️ config.yaml
 
-```yaml
 # 경로
-data_dir:  /content/drive/MyDrive/Hanbat/AI_Detect
+data_dir: data  # 상대 경로 사용
 checkpoint_dir: checkpoint
-result_csv: ${data_dir}/Result/submission.csv
+result_csv: submission.csv  # 상대 경로로 변경
 
 # 공통
 seed: 42
@@ -15,6 +13,19 @@ max_length: 64
 batch_size:
   mistral: 16
   deberta: 32
+
+# 진행 상황 및 로깅
+logging:
+  save_log: true
+  log_file: log.txt
+  verbose: true
+  show_progress: true
+
+# 데이터 처리
+data_preprocessing:
+  handle_null: true
+  clean_text: true
+  remove_duplicates: false
 
 # Mistral‑7B QLoRA
 mistral:

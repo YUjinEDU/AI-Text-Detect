@@ -1,0 +1,264 @@
+================================================================================
+[2025-05-09 15:25:42] [INFO] 로그 파일 열림: log.txt
+================================================================================
+================================================================================
+[2025-05-09 15:25:42] [INFO] K-Fold 분할 시작
+================================================================================
+[2025-05-09 15:25:42] [INFO] 데이터 로드 중...
+[2025-05-09 15:25:42] [INFO] 총 3000개 샘플 로드 완료
+[2025-05-09 15:25:42] [INFO] 데이터 검증 결과:
+[2025-05-09 15:25:42] [INFO] - 총 행 수: 3000
+[2025-05-09 15:25:42] [INFO] - NULL 텍스트: 0 (0.00%)
+[2025-05-09 15:25:42] [INFO] - NULL 라벨: 0 (0.00%)
+[2025-05-09 15:25:42] [INFO] - 중복 행: 0 (0.00%)
+[2025-05-09 15:25:42] [INFO] - 텍스트 정제를 적용했습니다.
+[2025-05-09 15:25:42] [INFO] KFold 비활성화 상태 - 전체 데이터 저장
+================================================================================
+[2025-05-09 15:25:42] [INFO] train_folds.csv 저장 완료: data\train_folds.csv
+================================================================================
+================================================================================
+[2025-05-09 15:26:01] [INFO] 로그 파일 열림: log.txt
+================================================================================
+================================================================================
+[2025-05-09 15:26:01] [INFO] TF-IDF + LightGBM 학습 시작
+================================================================================
+[2025-05-09 15:26:01] [INFO] 데이터 로드 중...
+[2025-05-09 15:26:01] [INFO] 데이터 검증 결과:
+[2025-05-09 15:26:01] [INFO] - 총 행 수: 3000
+[2025-05-09 15:26:01] [INFO] - NULL 텍스트: 0 (0.00%)
+[2025-05-09 15:26:01] [INFO] - NULL 라벨: 0 (0.00%)
+[2025-05-09 15:26:01] [INFO] - 중복 행: 0 (0.00%)
+[2025-05-09 15:26:01] [INFO] - 텍스트 정제를 적용했습니다.
+[2025-05-09 15:26:01] [INFO] 데이터 분할 중...
+[2025-05-09 15:26:01] [INFO] 학습 샘플: 2400개, 검증 샘플: 600개
+[2025-05-09 15:26:01] [INFO] TF-IDF 피처 추출 중 (ngrams=[1, 5], max_features=150000)...
+[2025-05-09 15:26:08] [INFO] TF-IDF 피처 추출 완료: 150000 피처 (소요시간: 6초)
+[2025-05-09 15:26:08] [INFO] LightGBM 모델 학습 중 (n_estimators=500, lr=0.05)...
+================================================================================
+[2025-05-09 15:26:09] [INFO] 에러 발생: LGBMClassifier.fit() got an unexpected keyword argument 'early_stopping_rounds'
+================================================================================
+================================================================================
+[2025-05-09 15:26:30] [INFO] 로그 파일 열림: log.txt
+================================================================================
+================================================================================
+[2025-05-09 15:26:30] [INFO] TF-IDF + LightGBM 학습 시작
+================================================================================
+[2025-05-09 15:26:30] [INFO] 데이터 로드 중...
+[2025-05-09 15:26:30] [INFO] 데이터 검증 결과:
+[2025-05-09 15:26:30] [INFO] - 총 행 수: 3000
+[2025-05-09 15:26:30] [INFO] - NULL 텍스트: 0 (0.00%)
+[2025-05-09 15:26:30] [INFO] - NULL 라벨: 0 (0.00%)
+[2025-05-09 15:26:30] [INFO] - 중복 행: 0 (0.00%)
+[2025-05-09 15:26:30] [INFO] - 텍스트 정제를 적용했습니다.
+[2025-05-09 15:26:30] [INFO] 데이터 분할 중...
+[2025-05-09 15:26:30] [INFO] 학습 샘플: 2400개, 검증 샘플: 600개
+[2025-05-09 15:26:30] [INFO] TF-IDF 피처 추출 중 (ngrams=[1, 5], max_features=150000)...
+[2025-05-09 15:26:37] [INFO] TF-IDF 피처 추출 완료: 150000 피처 (소요시간: 6초)
+[2025-05-09 15:26:37] [INFO] LightGBM 모델 학습 중 (n_estimators=500, lr=0.05)...
+================================================================================
+[2025-05-09 15:26:37] [INFO] 에러 발생: LGBMClassifier.fit() got an unexpected keyword argument 'verbose'
+================================================================================
+================================================================================
+[2025-05-09 15:26:53] [INFO] 로그 파일 열림: log.txt
+================================================================================
+================================================================================
+[2025-05-09 15:26:53] [INFO] TF-IDF + LightGBM 학습 시작
+================================================================================
+[2025-05-09 15:26:53] [INFO] 데이터 로드 중...
+[2025-05-09 15:26:53] [INFO] 데이터 검증 결과:
+[2025-05-09 15:26:53] [INFO] - 총 행 수: 3000
+[2025-05-09 15:26:53] [INFO] - NULL 텍스트: 0 (0.00%)
+[2025-05-09 15:26:53] [INFO] - NULL 라벨: 0 (0.00%)
+[2025-05-09 15:26:53] [INFO] - 중복 행: 0 (0.00%)
+[2025-05-09 15:26:53] [INFO] - 텍스트 정제를 적용했습니다.
+[2025-05-09 15:26:53] [INFO] 데이터 분할 중...
+[2025-05-09 15:26:53] [INFO] 학습 샘플: 2400개, 검증 샘플: 600개
+[2025-05-09 15:26:53] [INFO] TF-IDF 피처 추출 중 (ngrams=[1, 5], max_features=150000)...
+[2025-05-09 15:27:00] [INFO] TF-IDF 피처 추출 완료: 150000 피처 (소요시간: 6초)
+[2025-05-09 15:27:00] [INFO] LightGBM 모델 학습 중 (n_estimators=500, lr=0.05)...
+[2025-05-09 15:27:03] [INFO] LightGBM 학습 완료 (소요시간: 3초)
+[2025-05-09 15:27:04] [INFO] 검증 정확도: 97.50%
+[2025-05-09 15:27:04] [INFO] 모델 저장 중...
+================================================================================
+[2025-05-09 15:27:05] [INFO] TF-IDF 및 LGBM 모델 저장 완료
+================================================================================
+================================================================================
+[2025-05-09 15:27:05] [INFO] 전체 TF-IDF + LGBM 과정 완료 (총 소요시간: 11초)
+================================================================================
+================================================================================
+[2025-05-09 15:27:12] [INFO] 로그 파일 열림: log.txt
+================================================================================
+================================================================================
+[2025-05-09 15:27:12] [INFO] KenLM 3-gram 모델 구축 시작
+================================================================================
+================================================================================
+[2025-05-09 15:27:12] [WARNING] 
+KenLM 모듈이 설치되어 있지 않습니다. KenLM 설치 방법:
+
+1. Linux:
+   pip install https://github.com/kpu/kenlm/archive/master.zip
+
+2. Windows (복잡):
+   a. MSVC 컴파일러와 CMake 설치 필요
+   b. https://github.com/kpu/kenlm 에서 소스코드 다운로드 후 빌드
+   c. 또는 WSL을 통해 Linux 환경에서 설치
+
+지금은 KenLM 기능을 건너뛰고 계속 진행합니다.
+후속 단계에서는 이 기능 없이도 전체 파이프라인이 동작하도록 처리되어 있습니다.
+
+================================================================================
+================================================================================
+[2025-05-09 15:27:12] [WARNING] Windows 환경에서는 KenLM 설치가 복잡할 수 있습니다. WSL 사용을 권장합니다.
+================================================================================
+[2025-05-09 15:27:12] [INFO] 더미 KenLM 파일을 생성했습니다: checkpoint\data3.binary
+================================================================================
+[2025-05-09 15:27:12] [INFO] 나머지 파이프라인은 정상적으로 진행됩니다.
+================================================================================
+================================================================================
+[2025-05-09 15:27:12] [INFO] 전체 KenLM 구축 과정 완료 (총 소요시간: 0초)
+================================================================================
+================================================================================
+[2025-05-09 15:27:23] [INFO] 로그 파일 열림: log.txt
+================================================================================
+================================================================================
+[2025-05-09 15:27:23] [INFO] 스태킹 메타 모델 학습 시작
+================================================================================
+================================================================================
+[2025-05-09 15:27:23] [INFO] 스태킹 학습 시작 (총 5 단계)
+================================================================================
+[2025-05-09 15:27:23] [INFO] 검증 데이터 로드 중...
+[2025-05-09 15:27:23] [INFO] 데이터 검증 결과:
+[2025-05-09 15:27:23] [INFO] - 총 행 수: 900
+[2025-05-09 15:27:23] [INFO] - NULL 텍스트: 0 (0.00%)
+[2025-05-09 15:27:23] [INFO] - NULL 라벨: 0 (0.00%)
+[2025-05-09 15:27:23] [INFO] - 중복 행: 0 (0.00%)
+[2025-05-09 15:27:23] [INFO] - 텍스트 정제를 적용했습니다.
+[2025-05-09 15:27:23] [INFO] 검증 데이터 로드 완료: 900개 샘플
+[2025-05-09 15:27:23] [INFO] 스태킹 학습 진행 중: 1/5 (20.0%) - 데이터 로드 완료 - 경과: 0초, 예상 남은 시간: 0초
+[2025-05-09 15:27:23] [INFO] Mistral-7B 추론 중...
+[2025-05-09 15:27:23] [INFO] Mistral-7B 모델 로드 중...
+================================================================================
+[2025-05-09 15:27:23] [ERROR] 에러 발생: mistralai/Mistral-7B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+================================================================================
+[2025-05-09 15:27:23] [ERROR] 상세 오류: Traceback (most recent call last):
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\utils\_http.py", line 409, in hf_raise_for_status
+    response.raise_for_status()
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\requests\models.py", line 1024, in raise_for_status
+    raise HTTPError(http_error_msg, response=self)
+requests.exceptions.HTTPError: 401 Client Error: Unauthorized for url: https://huggingface.co/mistralai/Mistral-7B-Instruct/resolve/main/tokenizer_config.json
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\transformers\utils\hub.py", line 424, in cached_files
+    hf_hub_download(
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\file_download.py", line 961, in hf_hub_download
+    return _hf_hub_download_to_cache_dir(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\file_download.py", line 1068, in _hf_hub_download_to_cache_dir
+    _raise_on_head_call_error(head_call_error, force_download, local_files_only)
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\file_download.py", line 1596, in _raise_on_head_call_error
+    raise head_call_error
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\file_download.py", line 1484, in _get_metadata_or_catch_error
+    metadata = get_hf_file_metadata(
+               ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\utils\_validators.py", line 114, in _inner_fn
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\file_download.py", line 1401, in get_hf_file_metadata
+    r = _request_wrapper(
+        ^^^^^^^^^^^^^^^^^
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\file_download.py", line 285, in _request_wrapper
+    response = _request_wrapper(
+               ^^^^^^^^^^^^^^^^^
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\file_download.py", line 309, in _request_wrapper
+    hf_raise_for_status(response)
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\huggingface_hub\utils\_http.py", line 459, in hf_raise_for_status
+    raise _format(RepositoryNotFoundError, message, response) from e
+huggingface_hub.errors.RepositoryNotFoundError: 401 Client Error. (Request ID: Root=1-681da048-2902ca4a0e4a481f6fb538c9;56d29f15-9251-4d57-bcea-20662fcd8cf3)
+
+Repository Not Found for url: https://huggingface.co/mistralai/Mistral-7B-Instruct/resolve/main/tokenizer_config.json.
+Please make sure you specified the correct `repo_id` and `repo_type`.
+If you are trying to access a private or gated repo, make sure you are authenticated. For more details, see https://huggingface.co/docs/huggingface_hub/authentication
+Invalid username or password.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\yujin\내 드라이브(dbsdosdb1@gmail.com)\Hanbat\AI_Detect\fake-detect\src\stack.py", line 171, in main
+    train_stacking(cfg)
+  File "C:\Users\yujin\내 드라이브(dbsdosdb1@gmail.com)\Hanbat\AI_Detect\fake-detect\src\stack.py", line 36, in train_stacking
+    mistral_prob = probs_model1(val_df['text'])
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yujin\내 드라이브(dbsdosdb1@gmail.com)\Hanbat\AI_Detect\fake-detect\src\train_lora.py", line 175, in probs_model1
+    tok = AutoTokenizer.from_pretrained(model_id, use_fast=True)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\transformers\models\auto\tokenization_auto.py", line 946, in from_pretrained
+    tokenizer_config = get_tokenizer_config(pretrained_model_name_or_path, **kwargs)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\transformers\models\auto\tokenization_auto.py", line 778, in get_tokenizer_config
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\transformers\utils\hub.py", line 266, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\yujin\AppData\Local\Programs\Python\Python311\Lib\site-packages\transformers\utils\hub.py", line 456, in cached_files
+    raise OSError(
+OSError: mistralai/Mistral-7B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+
+================================================================================
+[2025-05-09 15:27:34] [INFO] 로그 파일 열림: log.txt
+================================================================================
+================================================================================
+[2025-05-09 15:27:34] [INFO] 최종 추론 시작
+================================================================================
+================================================================================
+[2025-05-09 15:27:34] [INFO] 추론 파이프라인 시작 (총 6 단계)
+================================================================================
+[2025-05-09 15:27:34] [INFO] 테스트 데이터 로드 중...
+[2025-05-09 15:27:34] [INFO] 추론 파이프라인 진행 중: 1/6 (16.7%) - 데이터 로드 완료 - 경과: 0초, 예상 남은 시간: 0초
+[2025-05-09 15:27:34] [INFO] 데이터 검증 및 정제 중...
+[2025-05-09 15:27:34] [INFO] 데이터 검증 결과:
+[2025-05-09 15:27:34] [INFO] - 총 행 수: 1200
+[2025-05-09 15:27:34] [INFO] - NULL 텍스트: 0 (0.00%)
+[2025-05-09 15:27:34] [INFO] - 중복 행: 0 (0.00%)
+[2025-05-09 15:27:34] [INFO] - 텍스트 정제를 적용했습니다.
+[2025-05-09 15:27:34] [INFO] 추론 파이프라인 진행 중: 2/6 (33.3%) - 데이터 검증 완료 - 경과: 0초, 예상 남은 시간: 0초
+[2025-05-09 15:27:34] [WARNING] 경고: 다음 모델 파일이 없습니다: meta.pkl
+[2025-05-09 15:27:34] [WARNING] 일부 모델 없이도 계속 진행합니다. 결과가 부정확할 수 있습니다.
+[2025-05-09 15:27:34] [INFO] TF-IDF 모델 로드 중...
+[2025-05-09 15:27:34] [INFO] TF-IDF 및 LGBM 모델 로드 완료 (소요시간: 0초)
+[2025-05-09 15:27:34] [INFO] TF-IDF 예측 중...
+[2025-05-09 15:27:35] [INFO] TF-IDF 예측 완료 (소요시간: 0초)
+[2025-05-09 15:27:35] [INFO] 추론 파이프라인 진행 중: 3/6 (50.0%) - TF-IDF 예측 완료 - 경과: 1초, 예상 남은 시간: 1초
+[2025-05-09 15:27:35] [INFO] Perplexity 계산 중...
+[2025-05-09 15:27:35] [WARNING] KenLM 모듈이 설치되어 있지 않습니다. 랜덤 Perplexity 값을 사용합니다.
+[2025-05-09 15:27:35] [INFO] Perplexity 계산 완료 (소요시간: 0초)
+[2025-05-09 15:27:35] [INFO] 추론 파이프라인 진행 중: 4/6 (66.7%) - Perplexity 계산 완료 - 경과: 1초, 예상 남은 시간: 0초
+[2025-05-09 15:27:35] [INFO] Mistral 모델 예측 중...
+[2025-05-09 15:27:35] [INFO] Mistral-7B 모델 로드 중...
+[2025-05-09 15:27:35] [ERROR] Mistral 모델 예측 중 오류 발생: mistralai/Mistral-7B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `huggingface-cli login` or by passing `token=<your_token>`
+[2025-05-09 15:27:35] [INFO] 랜덤 확률값을 사용합니다.
+[2025-05-09 15:27:35] [INFO] 추론 파이프라인 진행 중: 5/6 (83.3%) - Mistral 예측 완료 - 경과: 1초, 예상 남은 시간: 0초
+[2025-05-09 15:27:35] [INFO] DeBERTa 모델 예측 중...
+[2025-05-09 15:27:35] [INFO] DeBERTa-v3-Large 모델 로드 중...
+[2025-05-09 15:28:56] [ERROR] DeBERTa 모델 예측 중 오류 발생: 체크포인트 파일이 없습니다: checkpoint\deberta.pt
+[2025-05-09 15:28:56] [INFO] 랜덤 확률값을 사용합니다.
+[2025-05-09 15:28:56] [INFO] 추론 파이프라인 진행 중: 6/6 (100.0%) - DeBERTa 예측 완료 - 경과: 1분 22초, 예상 남은 시간: 0초
+[2025-05-09 15:28:56] [INFO] 메타 모델 로드 중...
+[2025-05-09 15:28:56] [ERROR] 메타 모델 로드 중 오류 발생: [Errno 2] No such file or directory: 'checkpoint\\meta.pkl'
+[2025-05-09 15:28:56] [WARNING] 간단한 투표 모델로 대체합니다.
+[2025-05-09 15:28:56] [INFO] 메타 모델로 앙상블 중...
+[2025-05-09 15:28:56] [ERROR] 메타 모델 예측 중 오류 발생: 'Series' object has no attribute 'reshape'
+[2025-05-09 15:28:56] [WARNING] 평균값으로 대체합니다.
+[2025-05-09 15:28:56] [INFO] 예측 클래스 분포: 0(진짜)=588개, 1(가짜)=612개
+[2025-05-09 15:28:56] [INFO] 결과 통계: 총 1200개, 가짜 텍스트 비율: 51.00%
+================================================================================
+[2025-05-09 15:28:56] [INFO] 추론 파이프라인 완료 - submission.csv 저장 완료: submission.csv (소요시간: 1분 22초)
+================================================================================
