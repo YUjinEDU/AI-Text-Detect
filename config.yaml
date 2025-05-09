@@ -11,8 +11,10 @@ result_csv: submission.csv  # 상대 경로로 변경
 seed: 42
 max_length: 256  # nan 방지: 너무 길지 않게
 batch_size:
-  mistral: 8    # nan 방지: batch size 줄임
+  mistral: 8
+  mistral_infer: 16 # Mistral/Qwen 추론용 배치 크기
   deberta: 32
+  deberta_infer: 64 # DeBERTa 추론용 배치 크기
 
 # 진행 상황 및 로깅
 logging:
@@ -46,6 +48,8 @@ deberta:
   lora_alpha: 16
   lr: 2.0e-5
   epochs: 3
+  # DeBERTa LoRA 학습 시 타겟 모듈 (모델 구조 확인 후 정확히 명시)
+  lora_target_modules: ["query_proj", "key_proj", "value_proj", "intermediate.dense", "output.dense", "attention.output.dense"] # 예시 값입니다. 실제 모델에 맞게 수정하세요.
 
 # TF‑IDF / LightGBM
 tfidf:
