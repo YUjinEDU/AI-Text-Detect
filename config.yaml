@@ -9,9 +9,9 @@ result_csv: submission.csv  # 상대 경로로 변경
 
 # 공통
 seed: 42
-max_length: 64
+max_length: 256  # nan 방지: 너무 길지 않게
 batch_size:
-  mistral: 16
+  mistral: 8    # nan 방지: batch size 줄임
   deberta: 32
 
 # 진행 상황 및 로깅
@@ -29,10 +29,10 @@ data_preprocessing:
 
 # Mistral‑7B QLoRA
 mistral:
-  model_id: mistralai/Mistral-7B-Instruct
-  lora_r: 8
+  model_id: Qwen/Qwen3-4B
+  lora_r: 64
   lora_alpha: 32
-  lr: 1.0e-4
+  lr: 5.0e-6   # nan 방지: 더 낮은 학습률
   epochs: 3
   quant:
     load_in_4bit: true
@@ -57,7 +57,7 @@ lgbm:
 
 # Noise augmentation
 augment:
-  enable: true
+  enable: false   # nan 방지: 증강 비활성화
   p_noise: 0.3
   mask_ratio: 0.15
   swapcase_ratio: 0.10

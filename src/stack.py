@@ -30,12 +30,12 @@ def train_stacking(cfg):
     progress.update(msg="데이터 로드 완료")
     
     # 모델별 예측
-    # 1) Mistral 확률
-    utils.log("Mistral-7B 추론 중...")
+    # 1) Qwen3-4B 확률
+    utils.log("Qwen3-4B 추론 중...")
     start_time = time.time()
-    mistral_prob = probs_model1(val_df['text'])
-    utils.log(f"Mistral-7B 추론 완료 (소요시간: {utils.format_time(time.time() - start_time)})")
-    progress.update(msg="Mistral 예측 완료")
+    qwen_prob = probs_model1(val_df['text'])
+    utils.log(f"Qwen3-4B 추론 완료 (소요시간: {utils.format_time(time.time() - start_time)})")
+    progress.update(msg="Qwen3-4B 예측 완료")
     
     # 2) DeBERTa 확률
     utils.log("DeBERTa-v3-Large 추론 중...")
@@ -103,38 +103,38 @@ def train_stacking(cfg):
     
     # 메타 특성 구성
     utils.log("메타 특성 구성 및 LogReg 모델 학습 중...")
-    meta_X = pd.DataFrame({
-        'mistral': mistral_prob,
+    X = pd.DataFrame({
+        'qwen3-4b': qwen_prob,
         'deberta': deberta_prob,
         'tfidf':   tfidf_prob,
-        'ppl':     ppl
+        'kenlm':   ppl
     })
     
     # NULL 값 체크
-    null_counts = meta_X.isna().sum()
+    null_counts = X.isna().sum()
     if null_counts.sum() > 0:
         utils.log(f"경고: 특성 데이터에 NULL 값이 발견되었습니다: {null_counts.to_dict()}", level="WARNING")
-        meta_X = meta_X.fillna(0)  # NULL 값 0으로 대체
+        X = X.fillna(0)  # NULL 값 0으로 대체
         utils.log("NULL 값을 0으로 대체했습니다.")
     
     # 특성 통계 확인
     utils.log("특성 통계:")
-    for col in meta_X.columns:
-        utils.log(f"  {col}: 평균={meta_X[col].mean():.4f}, 표준편차={meta_X[col].std():.4f}, 최소={meta_X[col].min():.4f}, 최대={meta_X[col].max():.4f}")
+    for col in X.columns:
+        utils.log(f"  {col}: 평균={X[col].mean():.4f}, 표준편차={X[col].std():.4f}, 최소={X[col].min():.4f}, 최대={X[col].max():.4f}")
     
     # LogReg 학습
     try:
-        meta = LogisticRegression(max_iter=1000, random_state=cfg['seed']).fit(meta_X, val_df['label'])
+        meta = LogisticRegression(max_iter=1000, random_state=cfg['seed']).fit(X, val_df['label'])
         
         # 성능 평가
-        pred_proba = meta.predict_proba(meta_X)[:, 1]
+        pred_proba = meta.predict_proba(X)[:, 1]
         pred = (pred_proba > 0.5).astype(int)
         acc = (pred == val_df['label']).mean() * 100
         utils.log(f"메타 모델 정확도: {acc:.2f}%")
         
         # 특성 중요도
         coef = pd.DataFrame({
-            'feature': meta_X.columns,
+            'feature': X.columns,
             'importance': np.abs(meta.coef_[0])
         }).sort_values('importance', ascending=False)
         

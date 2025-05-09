@@ -1,4 +1,3 @@
-
 # Fake-Detect 파이프라인
 
 ## 📚 프로젝트 개요
@@ -227,20 +226,65 @@ python src/train_lora.py
    - 해결 방법: 무시해도 됨 (더미 파일 자동 생성되어 진행)
    - 설치 원하면: `pip install https://github.com/kpu/kenlm/archive/master.zip`
 
-2. **Hugging Face 모델 다운로드 오류**
-   - 에러 메시지: `Repository Not Found` 또는 `Unauthorized`
-   - 해결 방법: `.env` 파일에 `HUGGINGFACE_TOKEN=your_token` 추가
-   - 또는: 환경변수로 `set HUGGINGFACE_TOKEN=your_token`
+2. **Hugging Face 모델 다운로드/접근 오류 (gated repo, 토큰, 권한 등)**
+   - 에러 메시지: `Repository Not Found`, `Unauthorized`, `You are trying to access a gated repo`, `401 Client Error`, `Access to model ... is restricted` 등
+   - **원인:**
+     - HuggingFace 계정 로그인/토큰 미설정
+     - 모델 접근 권한 미신청/미승인
+     - 토큰이 코드/환경에 전달되지 않음
+   - **해결 방법:**
+     1. [HuggingFace 회원가입/로그인](https://huggingface.co/join)
+     2. [Access Tokens](https://huggingface.co/settings/tokens)에서 토큰 생성 (read 권한 이상)
+     3. 터미널에서 `huggingface-cli login` 후 토큰 입력
+     4. 또는 환경변수로 등록 (리눅스/맥: `export HUGGINGFACE_TOKEN=hf_...`, 윈도우: `set HUGGINGFACE_TOKEN=hf_...`)
+     5. 코드에서 직접 토큰 전달 가능:
+        ```python
+        tokenizer = AutoTokenizer.from_pretrained(model_id, token="hf_...")
+        model = AutoModelForCausalLM.from_pretrained(model_id, token="hf_...")
+        ```
+     6. 모델 페이지에서 'Request access' 버튼 클릭 후 승인 대기 (gated repo)
+     7. transformers/huggingface_hub 최신화: `pip install --upgrade "transformers>=4.42.0" huggingface_hub`
+     8. 캐시 문제시: `rm -rf ~/.cache/huggingface`
 
-3. **CUDA 메모리 부족**
+3. **sentencepiece 미설치 오류**
+   - 에러 메시지: `Cannot instantiate this tokenizer from a slow version. If it's based on sentencepiece, make sure you have sentencepiece installed.`
+   - 해결 방법: `pip install sentencepiece` 설치 후 파이썬 런타임 재시작
+
+4. **tiktoken, protobuf 등 기타 패키지 오류**
+   - 에러 메시지: `No module named 'tiktoken'`, `requires the protobuf library but it was not found in your environment.`
+   - 해결 방법: `pip install --upgrade protobuf tiktoken transformers`
+
+5. **CUDA 메모리 부족**
    - 에러 메시지: `CUDA out of memory`
-   - 해결 방법: `config.yaml`에서 `batch_size` 감소
-   - 또는: 더 작은 모델 사용 (config.yaml에서 model_id 변경)
+   - 해결 방법: `config.yaml`에서 `batch_size` 감소, 더 작은 모델 사용
 
-4. **모델 파일 없음 오류**
+6. **모델 파일 없음 오류**
    - 에러 메시지: `체크포인트 파일이 없습니다`
    - 원인: 이전 단계 학습이 실행되지 않음
    - 해결 방법: 누락된 스크립트 실행 (infer.py는 자동으로 대체 로직 사용)
+
+7. **기타 실전 팁**
+   - requirements.txt에 `sentencepiece`, `protobuf`, `tiktoken` 등 필수 패키지 추가 추천
+   - 토큰은 config.yaml에 직접 적지 말고 환경변수(.env)로만 관리
+   - 네트워크/VPN 환경에 따라 huggingface.co 접속이 막힐 수 있으니, 집/개인망에서 시도
+   - root/sudo 환경에서 실행 시에도 huggingface-cli login 필요
+
+---
+
+### 예시: Mistral-7B-Instruct-v0.3 모델 사용을 위한 준비
+
+1. HuggingFace 회원가입 및 토큰 발급
+2. 모델 페이지에서 'Request access' 후 승인
+3. 터미널에서 huggingface-cli login (토큰 입력)
+4. transformers 4.42.0 이상 설치
+   ```bash
+   pip install --upgrade "transformers>=4.42.0" huggingface_hub sentencepiece protobuf tiktoken
+   ```
+5. 코드에서 model_id 정확히 입력: `mistralai/Mistral-7B-Instruct-v0.3`
+6. (필요시) 토큰을 코드에서 직접 전달
+7. 캐시 문제시 캐시 삭제 후 재시도
+
+---
 
 ### 성능 개선 방법
 

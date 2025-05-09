@@ -111,18 +111,16 @@ def run_inference(cfg):
     utils.log(f"Perplexity 계산 완료 (소요시간: {utils.format_time(time.time() - start_time)})")
     progress.update(msg="Perplexity 계산 완료")
     
-    # Mistral 모델 예측
-    utils.log("Mistral 모델 예측 중...")
+    # Qwen3-4B 모델 예측
+    utils.log("Qwen3-4B 모델 예측 중...")
     start_time = time.time()
     try:
-        mistral_p = probs_model1(test_df['text'])
-        utils.log(f"Mistral 모델 예측 완료 (소요시간: {utils.format_time(time.time() - start_time)})")
+        qwen_p = probs_model1(test_df['text'].tolist())
+        utils.log(f"Qwen3-4B 예측 완료 (소요시간: {utils.format_time(time.time() - start_time)})")
     except Exception as e:
-        utils.log(f"Mistral 모델 예측 중 오류 발생: {str(e)}", level="ERROR")
-        utils.log("랜덤 확률값을 사용합니다.")
-        mistral_p = np.random.uniform(0, 1, size=len(test_df))
-    
-    progress.update(msg="Mistral 예측 완료")
+        utils.log(f"Qwen3-4B 예측 중 오류 발생: {str(e)}", level="ERROR")
+        qwen_p = np.random.uniform(0, 1, size=len(test_df))
+    progress.update(msg="Qwen3-4B 예측 완료")
     
     # DeBERTa 모델 예측
     utils.log("DeBERTa 모델 예측 중...")
@@ -153,7 +151,7 @@ def run_inference(cfg):
     
     utils.log("메타 모델로 앙상블 중...")
     X = pd.DataFrame({
-        'mistral': mistral_p,
+        'qwen3-4b': qwen_p,
         'deberta': deberta_p,
         'tfidf':   tfidf_p,
         'ppl':     ppl
