@@ -26,11 +26,11 @@ def train_deberta(cfg):
         raise FileNotFoundError(f"{data_path} 파일이 존재하지 않습니다.")
     
     utils.log("데이터 로드 중...")
-    raw = pd.read_csv(data_path)
-    raw = utils.check_and_clean_data(cfg)  # NULL 값 체크 및 처리
+    raw_df = pd.read_csv(data_path)
+    raw_df = utils.check_and_clean_data(df=raw_df, text_col='text', cfg=cfg) # 수정된 라인
     
     # 데이터 분할
-    train_df, val_df = train_test_split(raw, test_size=0.3, stratify=raw['label'], random_state=cfg['seed'])
+    train_df, val_df = train_test_split(raw_df, test_size=0.3, stratify=raw_df['label'], random_state=cfg['seed'])
     utils.log(f"데이터 분할 완료: 학습 {len(train_df)}개, 검증 {len(val_df)}개")
     
     def is_valid_text(x):
@@ -168,6 +168,39 @@ def probs_model2(texts, cfg=None): # cfg를 인자로 받거나 내부에서 로
     # 1. 토크나이저 로드
     tok = AutoTokenizer.from_pretrained(model_id, use_fast=True)
 
+    # BitsAndBytesConfig 설정 (DeBERTa용)
+    # config.yaml에서 deberta.quant 설정을 읽어오도록 할 수도 있습니다.
+    # 여기서는 직접 설정합니다.
+    load_in_4bit_deberta = cfg['deberta'].get('quant', {}).get('load_in_4bit', True) # config.yaml에 추가 권장
+
+
+    if load_in_4bit_deberta:
+        bnb_config_deberta = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_use_double_quant=cfg['deberta'].get('quant', {}).get('double_quant', True),
+            bnb_4bit_quant_type=cfg['deberta'].get('quant', {}).get('quant_type', "nf4"), # "nf4" 또는 "fp4"
+            bnb_4bit_compute_dtype=torch.bfloat16 # 연산 시 사용할 데이터 타입
+        )
+        utils.log(f"DeBERTa BitsAndBytesConfig: load_in_4bit={bnb_config_deberta.load_in_4bit}, quant_type={bnb_config_deberta.bnb_4bit_quant_type}")
+        quantization_config_arg = bnb_config_deberta
+        torch_dtype_arg = None # quantization_config 사용 시 torch_dtype은 bnb_4bit_compute_dtype로 관리됨
+    else:
+        quantization_config_arg = None
+        torch_dtype_arg = torch.bfloat16 # 양자화 안 할 경우 bfloat16 사용
+        utils.log("DeBERTa 4-bit 양자화를 사용하지 않습니다. BF16/FP16으로 로드합니다.")
+
+
+    utils.log("DeBERTa-v3-Large 모델 로드 중 (양자화 적용)...")
+    # AutoModelForSequenceClassification 설정
+    # num_labels는 자동으로 감지되거나, 명시적으로 설정할 수 있습니다.
+    # 일반적으로는 config.json에 정의된 num_labels를 사용하거나,
+    # fine-tuning 시에는 직접 지정합니다. (여기서는 2개 클래스)
+    model_config_args = {"num_labels": 2, "pad_token_id": tok.pad_token_id}
+    if quantization_config_arg: # 양자화 사용 시
+        model_config_args["quantization_config"] = quantization_config_arg
+    if torch_dtype_arg: # 양자화 미사용 시
+         model_config_args["torch_dtype"] = torch_dtype_arg
+
     # 2. 베이스 모델 로드
     # 학습 시와 동일하게 num_labels, pad_token_id 등을 설정
     # 추론 시에는 일반적으로 양자화 없이 float16 또는 bfloat16으로 로드하여 속도를 높임
@@ -240,7 +273,7 @@ def probs_model2(texts, cfg=None): # cfg를 인자로 받거나 내부에서 로
             cleaned_texts.append("") # 또는 적절한 기본값
             utils.log("입력 텍스트 중 NaN 값을 빈 문자열로 처리했습니다.", level="WARNING")
         else:
-            cleaned_texts.append(utils.clean_text(str(t), cfg=cfg)) # cfg 전달
+            cleaned_texts.append(utils.clean_text(str(t))) # cfg 전달
 
     results = []
     # config.yaml에 deberta_infer 배치 크기 설정 권장

@@ -126,7 +126,8 @@ def train_lora(cfg, epochs=None, batch_size=None, lr=None):
     train_dl = DataLoader(QwenDataset(train_df, aug=True), batch_size=batch_size, shuffle=True)
     val_dl = DataLoader(QwenDataset(val_df), batch_size=batch_size)
     opt = AdamW(model.parameters(), lr=lr, eps=1e-8)
-    sched = get_linear_schedule_with_warmup(opt, en(train_dl) * epochs // 20, len(train_dl)*epochs)
+    sched = get_linear_schedule_with_warmup(opt, num_warmup_steps=len(train_dl) * epochs // 20, num_training_steps=len(train_dl)*epochs) # 수정된 라인
+
     early = utils.EarlyStopping(patience=3, verbose=True)
     utils.log("학습 시작", is_important=True)
     progress = utils.ProgressTracker(epochs, "Qwen3-4B QLoRA 학습")
@@ -295,7 +296,7 @@ def probs_model1(texts, cfg=None): # cfg를 인자로 받거나 내부에서 로
             cleaned_texts.append("") # 또는 적절한 기본값
             utils.log("입력 텍스트 중 NaN 값을 빈 문자열로 처리했습니다.", level="WARNING")
         else:
-            cleaned_texts.append(utils.clean_text(str(t), cfg=cfg)) # cfg 전달
+            cleaned_texts.append(utils.clean_text(str(t))) # cfg 전달
 
     for i in tqdm(range(0, len(cleaned_texts), batch_size), desc=f"{model_id} 추론"):
         batch_texts = cleaned_texts[i:i+batch_size]

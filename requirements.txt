@@ -32,3 +32,5 @@ accelerate>=0.21.0
 # matplotlib>=3.5.0
 
 python-dotenv>=1.0.0
+
+pip install --upgrade transformers peft accelerate bitsandbytes

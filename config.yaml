@@ -32,7 +32,7 @@ data_preprocessing:
 # Mistral‑7B QLoRA
 mistral:
   model_id: Qwen/Qwen3-4B
-  lora_r: 64
+  lora_r: 16
   lora_alpha: 32
   lr: 5.0e-6   # nan 방지: 더 낮은 학습률
   epochs: 3
