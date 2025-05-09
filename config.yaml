@@ -1,0 +1,67 @@
+
+---
+
+## ⚙️ config.yaml
+
+```yaml
+# 경로
+data_dir:  /content/drive/MyDrive/Hanbat/AI_Detect
+checkpoint_dir: checkpoint
+result_csv: ${data_dir}/Result/submission.csv
+
+# 공통
+seed: 42
+max_length: 64
+batch_size:
+  mistral: 16
+  deberta: 32
+
+# Mistral‑7B QLoRA
+mistral:
+  model_id: mistralai/Mistral-7B-Instruct
+  lora_r: 8
+  lora_alpha: 32
+  lr: 1.0e-4
+  epochs: 3
+  quant:
+    load_in_4bit: true
+    quant_type: nf4
+    double_quant: true
+
+# DeBERTa‑v3‑Large LoRA
+deberta:
+  model_id: microsoft/deberta-v3-large
+  lora_r: 8
+  lora_alpha: 16
+  lr: 2.0e-5
+  epochs: 3
+
+# TF‑IDF / LightGBM
+tfidf:
+  ngram: [1, 5]
+  max_features: 150000
+lgbm:
+  n_estimators: 500
+  learning_rate: 0.05
+
+# Noise augmentation
+augment:
+  enable: true
+  p_noise: 0.3
+  mask_ratio: 0.15
+  swapcase_ratio: 0.10
+
+# KFOLD & Optuna
+kfold:
+  enable: false
+  n_splits: 5
+optuna:
+  enable: false
+  trials: 20
+
+# (선택) 외부 서비스/민감 정보 관리 예시
+# 실제 키는 환경변수(예: HUGGINGFACE_TOKEN, WANDB_API_KEY)로 관리하고,
+# 아래는 참고용/로컬 테스트용으로만 사용하세요.
+external:
+  huggingface_token: ${HUGGINGFACE_TOKEN}  # 또는 직접 입력하지 말고 환경변수로 관리
+  wandb_api_key: ${WANDB_API_KEY}
