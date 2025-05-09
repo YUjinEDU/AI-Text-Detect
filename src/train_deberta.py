@@ -155,6 +155,38 @@ def train_deberta(cfg):
     torch.save(model.state_dict(), ckpt_path)
     
     progress.finish(f"모델 저장 완료: {ckpt_path}")
+
+    # 주요 객체 명시적 삭제
+    utils.log("주요 학습 객체 삭제 시도...")
+    try:
+        del model
+        del tok
+        del raw_df
+        del train_df
+        del val_df
+        del train_dl
+        del val_dl
+        del optim
+        del sched
+        # DS 클래스 인스턴스는 DataLoader에 의해 관리되므로 별도 삭제 불필요할 수 있음
+        utils.log("주요 학습 객체 삭제 완료.")
+    except NameError as e:
+        utils.log(f"객체 삭제 중 오류 (이미 삭제되었거나 정의되지 않았을 수 있음): {e}", level="WARNING")
+    except Exception as e:
+        utils.log(f"객체 삭제 중 예기치 않은 오류: {e}", level="ERROR")
+
+    # 메모리 정리 코드 추가
+    utils.log("메모리 정리 시작...")
+    import gc
+    if torch.cuda.is_available():
+        utils.log("CUDA 캐시 비우는 중...")
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        utils.log("CUDA 캐시 비우기 완료.")
+    utils.log("가비지 컬렉션 실행 중...")
+    gc.collect()
+    utils.log("메모리 정리 완료.")
+    
     return val_loss
 
 # ---------------- 추론 함수 (probs_model2) ----------------
@@ -209,7 +241,7 @@ def probs_model2(texts, cfg=None): # cfg를 인자로 받거나 내부에서 로
         model_id,
         num_labels=2, # 학습 시와 동일
         pad_token_id=tok.pad_token_id, # 학습 시와 동일
-        torch_dtype=torch.float16, # 학습 시와 동일 또는 bfloat16/float32
+        torch_dtype=torch.bfloat16, # 학습 시와 동일 또는 bfloat16/float32
         # device_map="auto" # 추론 시에는 단일 GPU 사용이 일반적이므로 제거하거나 명시적 디바이스 지정
     )
 

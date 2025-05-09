@@ -8,6 +8,7 @@ import utils
 from sklearn.model_selection import train_test_split
 import argparse
 import time
+import gc
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -49,7 +50,7 @@ def train_lora(cfg, epochs=None, batch_size=None, lr=None):
     utils.log("Qwen3-4B 모델 및 토크나이저 로드 중...")
     start_time = time.time()
     model_id = cfg['mistral']['model_id']
-    tok = AutoTokenizer.from_pretrained(model_id, use_fast=True)
+    tok = AutoTokenizer.from_pretrained(model_id, use_fast=True, trust_remote_code=True, padding_side='left')
     if tok.pad_token_id is None:
         tok.pad_token_id = tok.eos_token_id
     bnb = BitsAndBytesConfig(load_in_4bit=cfg['mistral']['quant']['load_in_4bit'],
@@ -126,7 +127,7 @@ def train_lora(cfg, epochs=None, batch_size=None, lr=None):
     train_dl = DataLoader(QwenDataset(train_df, aug=True), batch_size=batch_size, shuffle=True)
     val_dl = DataLoader(QwenDataset(val_df), batch_size=batch_size)
     opt = AdamW(model.parameters(), lr=lr, eps=1e-8)
-    sched = get_linear_schedule_with_warmup(opt, num_warmup_steps=len(train_dl) * epochs // 20, num_training_steps=len(train_dl)*epochs) # 수정된 라인
+    sched = get_linear_schedule_with_warmup(opt, num_warmup_steps=len(train_dl) * epochs // 10, num_training_steps=len(train_dl)*epochs) # 수정된 라인
 
     early = utils.EarlyStopping(patience=3, verbose=True)
     utils.log("학습 시작", is_important=True)
@@ -144,7 +145,7 @@ def train_lora(cfg, epochs=None, batch_size=None, lr=None):
                 utils.log(f"[nan 감지] input_ids: {b['input_ids']}")
             train_progress.set_postfix({'loss': f"{out.loss.item():.4f}"})
             out.loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.25)
             opt.step()
             sched.step()
             total_loss += out.loss.item()
@@ -190,6 +191,37 @@ def train_lora(cfg, epochs=None, batch_size=None, lr=None):
     ckpt_path = os.path.join(cfg['checkpoint_dir'], 'qwen3-4b.pt')
     torch.save(model.state_dict(), ckpt_path)
     progress.finish(f"모델 저장 완료: {ckpt_path}")
+
+    # 주요 객체 명시적 삭제
+    utils.log("주요 학습 객체 삭제 시도...")
+    try:
+        del model
+        del tok
+        del raw # train_lora.py에서는 raw 변수 사용
+        del train_df
+        del val_df
+        del train_dl
+        del val_dl
+        del opt # train_lora.py에서는 opt 변수 사용
+        del sched
+        # QwenDataset 클래스 인스턴스는 DataLoader에 의해 관리
+        utils.log("주요 학습 객체 삭제 완료.")
+    except NameError as e:
+        utils.log(f"객체 삭제 중 오류 (이미 삭제되었거나 정의되지 않았을 수 있음): {e}", level="WARNING")
+    except Exception as e:
+        utils.log(f"객체 삭제 중 예기치 않은 오류: {e}", level="ERROR")
+
+    # 메모리 정리 코드 추가
+    utils.log("메모리 정리 시작...")
+    if torch.cuda.is_available():
+        utils.log("CUDA 캐시 비우는 중...")
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        utils.log("CUDA 캐시 비우기 완료.")
+    utils.log("가비지 컬렉션 실행 중...")
+    gc.collect()
+    utils.log("메모리 정리 완료.")
+
     return val_loss
 
 # ---------------- 추론 함수 (probs_model1) ----------------
@@ -324,7 +356,7 @@ def probs_model1(texts, cfg=None): # cfg를 인자로 받거나 내부에서 로
             # 생성된 전체 시퀀스에서 입력 프롬프트 부분을 제외하고 디코딩
             prompt_len = len(tok.encode(prompts[j], add_special_tokens=False)) # 입력 프롬프트의 길이
             # generated_ids_only = generated_outputs[j][prompt_len:] # generate가 입력까지 포함하여 출력하는 경우
-            # 때로는 generate 함수가 입력 ID를 제외하고 생성된 토큰만 반환하기도 함. 확인 필요.
+            # 때로는 generate 함수가 입력 ID를 제외한 부분만 반환하기도 함. 확인 필요.
             # transformers 최신 버전에서는 input_ids를 제외한 부분만 반환하는 경우가 많음.
             # 만약 generate가 전체 시퀀스를 반환하면 아래처럼 슬라이싱 필요:
             # full_decoded_text = tok.decode(generated_outputs[j], skip_special_tokens=True)
