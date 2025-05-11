@@ -1,6 +1,6 @@
 import os, pathlib, random, re, unicodedata, torch, pandas as pd, numpy as np
 from transformers import (AutoTokenizer, AutoModelForSequenceClassification, get_linear_schedule_with_warmup)
-from peft import get_peft_model, LoraConfig, TaskType
+from peft import get_peft_model, LoraConfig, TaskType, PeftModel
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import AdamW
 from tqdm.auto import tqdm
@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 import utils
 import time
 import re
+import gc
 
 
 # ---------------- Main Training Function ----------------
@@ -41,7 +42,6 @@ def train_deberta(cfg):
     utils.log(f"[라벨 분포] train: {train_df['label'].value_counts().to_dict()} val: {val_df['label'].value_counts().to_dict()}")
     utils.log(f"유효 텍스트 필터링 후 데이터: 학습 {len(train_df)}개, 검증 {len(val_df)}개")
 
-
     # 모델 및 토크나이저 로드
     utils.log("모델 및 토크나이저 로드 중...")
     start_time = time.time()
@@ -53,20 +53,22 @@ def train_deberta(cfg):
     model = AutoModelForSequenceClassification.from_pretrained(model_id, torch_dtype=torch.bfloat16, **cfg_model, device_map="auto")
     
     utils.log("LoRA 어댑터 초기화 중...")
-    model = get_peft_model(
-        model, 
-        LoraConfig(
-            task_type=TaskType.SEQ_CLS, 
-            r=cfg['deberta']['lora_r'], 
-            lora_alpha=cfg['deberta']['lora_alpha'], 
-            target_modules=["query_proj", "key_proj", "value_proj", "dense"]
-        )
+    # LoRA 설정 개선 - lora_dropout 및 bias 추가
+    lora_config = LoraConfig(
+        task_type=TaskType.SEQ_CLS, 
+        r=cfg['deberta']['lora_r'], 
+        lora_alpha=cfg['deberta']['lora_alpha'], 
+        lora_dropout=0.05,  # 드롭아웃 추가
+        bias="none",        # 명시적 bias 설정
+        target_modules=["query_proj", "key_proj", "value_proj", "dense"]
     )
+    model = get_peft_model(model, lora_config)
     utils.log(f"모델 준비 완료 (소요시간: {utils.format_time(time.time() - start_time)})")
     
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     utils.log(f"학습 디바이스: {DEVICE}")
     
+    # 데이터셋 클래스 - 메모리 효율성 개선
     class DS(Dataset):
         def __init__(self, df, aug=False):
             self.df, self.aug = df, aug
@@ -76,18 +78,23 @@ def train_deberta(cfg):
             if self.aug and cfg['augment']['enable'] and random.random() < cfg['augment']['p_noise']:
                 t = utils.noise_text(t, mask_ratio=cfg['augment']['mask_ratio'], swap_ratio=cfg['augment']['swapcase_ratio'])
             enc = tok(t, truncation=True, padding='max_length', max_length=cfg['max_length'], return_tensors='pt')
-            return {k: v.squeeze().to(DEVICE) for k, v in enc.items()} | {
-                'labels': torch.tensor(int(self.df.iloc[idx]['label']), device=DEVICE)
+            # 디바이스 전송을 배치 처리 시점으로 이동
+            return {k: v.squeeze() for k, v in enc.items()} | {
+                'labels': torch.tensor(int(self.df.iloc[idx]['label']))
             }
     
-    utils.log(f"하이퍼파라미터 설정: epochs={cfg['deberta']['epochs']}, batch_size={cfg['batch_size']['deberta']}, lr={cfg['deberta']['lr']:.1e}")
+    # 학습률 검토 및 설정
+    lr = cfg['deberta'].get('lr', 1e-5)  # 기본값 낮춤
+    utils.log(f"하이퍼파라미터 설정: epochs={cfg['deberta']['epochs']}, batch_size={cfg['batch_size']['deberta']}, lr={lr:.1e}")
     
     utils.log("데이터로더 초기화 중...")
     train_dl = DataLoader(DS(train_df, aug=True), batch_size=cfg['batch_size']['deberta'], shuffle=True)
     val_dl = DataLoader(DS(val_df), batch_size=cfg['batch_size']['deberta'])
     
-    optim = AdamW(model.parameters(), lr=cfg['deberta']['lr'])
-    sched = get_linear_schedule_with_warmup(optim, 0, len(train_dl)*cfg['deberta']['epochs'])
+    optim = AdamW(model.parameters(), lr=lr)
+    sched = get_linear_schedule_with_warmup(optim, 
+                                           num_warmup_steps=int(len(train_dl)*0.1),  # 10% 워밍업
+                                           num_training_steps=len(train_dl)*cfg['deberta']['epochs'])
     early = utils.EarlyStopping(patience=3, verbose=True)
     
     utils.log("학습 시작", is_important=True)
@@ -102,9 +109,16 @@ def train_deberta(cfg):
         # Train loop
         train_progress = tqdm(train_dl, desc=f"Epoch {epoch+1}/{cfg['deberta']['epochs']} (학습)", leave=False)
         for b in train_progress:
+            # 배치 데이터를 디바이스로 이동
+            b = {k: v.to(DEVICE) for k, v in b.items()}
+            
             optim.zero_grad()
             out = model(**b)
             out.loss.backward()
+            
+            # 그래디언트 클리핑 추가 - 안정성 향상
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
             optim.step()
             sched.step()
             total_loss += out.loss.item()
@@ -121,6 +135,9 @@ def train_deberta(cfg):
         val_progress = tqdm(val_dl, desc=f"Epoch {epoch+1}/{cfg['deberta']['epochs']} (검증)", leave=False)
         with torch.no_grad():
             for b in val_progress:
+                # 배치 데이터를 디바이스로 이동
+                b = {k: v.to(DEVICE) for k, v in b.items()}
+                
                 out = model(**b)
                 val_loss += out.loss.item()
                 
@@ -152,7 +169,20 @@ def train_deberta(cfg):
     
     utils.safe_makedirs(cfg['checkpoint_dir'])
     ckpt_path = os.path.join(cfg['checkpoint_dir'], 'deberta.pt')
-    torch.save(model.state_dict(), ckpt_path)
+    
+    # 모델 저장 방식 개선 - 어댑터만 저장
+    try:
+        # 1. 어댑터 저장 방식 (권장)
+        adapter_path = os.path.join(cfg['checkpoint_dir'], 'deberta_adapter')
+        utils.safe_makedirs(adapter_path)
+        model.save_pretrained(adapter_path)
+        utils.log(f"어댑터 저장 완료: {adapter_path}")
+        
+        # 2. 전체 state_dict 저장 (호환성 유지)
+        torch.save(model.state_dict(), ckpt_path)
+        utils.log(f"모델 state_dict 저장 완료: {ckpt_path}")
+    except Exception as e:
+        utils.log(f"모델 저장 중 오류: {e}", level="ERROR")
     
     progress.finish(f"모델 저장 완료: {ckpt_path}")
 
@@ -168,7 +198,6 @@ def train_deberta(cfg):
         del val_dl
         del optim
         del sched
-        # DS 클래스 인스턴스는 DataLoader에 의해 관리되므로 별도 삭제 불필요할 수 있음
         utils.log("주요 학습 객체 삭제 완료.")
     except NameError as e:
         utils.log(f"객체 삭제 중 오류 (이미 삭제되었거나 정의되지 않았을 수 있음): {e}", level="WARNING")
@@ -177,20 +206,18 @@ def train_deberta(cfg):
 
     # 메모리 정리 코드 추가
     utils.log("메모리 정리 시작...")
-    import gc
     if torch.cuda.is_available():
         utils.log("CUDA 캐시 비우는 중...")
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
         utils.log("CUDA 캐시 비우기 완료.")
-    utils.log("가비지 컬렉션 실행 중...")
     gc.collect()
     utils.log("메모리 정리 완료.")
     
     return val_loss
 
 # ---------------- 추론 함수 (probs_model2) ----------------
-def probs_model2(texts, cfg=None): # cfg를 인자로 받거나 내부에서 로드하도록 수정
+def probs_model2(texts, cfg=None):
     if cfg is None:
         cfg = utils.load_config()
 
@@ -200,159 +227,112 @@ def probs_model2(texts, cfg=None): # cfg를 인자로 받거나 내부에서 로
     # 1. 토크나이저 로드
     tok = AutoTokenizer.from_pretrained(model_id, use_fast=True)
 
-    # BitsAndBytesConfig 설정 (DeBERTa용)
-    # config.yaml에서 deberta.quant 설정을 읽어오도록 할 수도 있습니다.
-    # 여기서는 직접 설정합니다.
-    load_in_4bit_deberta = cfg['deberta'].get('quant', {}).get('load_in_4bit', True) # config.yaml에 추가 권장
-
-
-    if load_in_4bit_deberta:
-        bnb_config_deberta = BitsAndBytesConfig(
+    # 양자화 설정 단순화
+    bnb_config = None
+    torch_dtype = torch.bfloat16
+    
+    if cfg['deberta'].get('quant', {}).get('load_in_4bit', False):
+        from transformers import BitsAndBytesConfig
+        bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_use_double_quant=cfg['deberta'].get('quant', {}).get('double_quant', True),
-            bnb_4bit_quant_type=cfg['deberta'].get('quant', {}).get('quant_type', "nf4"), # "nf4" 또는 "fp4"
-            bnb_4bit_compute_dtype=torch.bfloat16 # 연산 시 사용할 데이터 타입
+            bnb_4bit_quant_type=cfg['deberta'].get('quant', {}).get('quant_type', "nf4"),
+            bnb_4bit_compute_dtype=torch.bfloat16
         )
-        utils.log(f"DeBERTa BitsAndBytesConfig: load_in_4bit={bnb_config_deberta.load_in_4bit}, quant_type={bnb_config_deberta.bnb_4bit_quant_type}")
-        quantization_config_arg = bnb_config_deberta
-        torch_dtype_arg = None # quantization_config 사용 시 torch_dtype은 bnb_4bit_compute_dtype로 관리됨
-    else:
-        quantization_config_arg = None
-        torch_dtype_arg = torch.bfloat16 # 양자화 안 할 경우 bfloat16 사용
-        utils.log("DeBERTa 4-bit 양자화를 사용하지 않습니다. BF16/FP16으로 로드합니다.")
+        utils.log("DeBERTa 4비트 양자화 설정 적용")
 
-
-    utils.log("DeBERTa-v3-Large 모델 로드 중 (양자화 적용)...")
-    # AutoModelForSequenceClassification 설정
-    # num_labels는 자동으로 감지되거나, 명시적으로 설정할 수 있습니다.
-    # 일반적으로는 config.json에 정의된 num_labels를 사용하거나,
-    # fine-tuning 시에는 직접 지정합니다. (여기서는 2개 클래스)
-    model_config_args = {"num_labels": 2, "pad_token_id": tok.pad_token_id}
-    if quantization_config_arg: # 양자화 사용 시
-        model_config_args["quantization_config"] = quantization_config_arg
-    if torch_dtype_arg: # 양자화 미사용 시
-         model_config_args["torch_dtype"] = torch_dtype_arg
-
-    # 2. 베이스 모델 로드
-    # 학습 시와 동일하게 num_labels, pad_token_id 등을 설정
-    # 추론 시에는 일반적으로 양자화 없이 float16 또는 bfloat16으로 로드하여 속도를 높임
-    # 여기서는 학습 시 설정(torch_dtype=torch.float16)을 따름
+    # 2. 베이스 모델 로드 - 단순화된 코드
+    model_config_args = {
+        "num_labels": 2,
+        "pad_token_id": tok.pad_token_id,
+        "torch_dtype": torch_dtype,
+        "device_map": "auto"
+    }
+    
+    if bnb_config:
+        model_config_args["quantization_config"] = bnb_config
+    
     base_model = AutoModelForSequenceClassification.from_pretrained(
-        model_id,
-        num_labels=2, # 학습 시와 동일
-        pad_token_id=tok.pad_token_id, # 학습 시와 동일
-        torch_dtype=torch.bfloat16, # 학습 시와 동일 또는 bfloat16/float32
-        # device_map="auto" # 추론 시에는 단일 GPU 사용이 일반적이므로 제거하거나 명시적 디바이스 지정
+        model_id, **model_config_args
     )
 
-    # 3. LoRA 설정 정의 (학습 시와 동일하게)
-    # DeBERTa-v3-Large에 맞는 target_modules 설정
-    # 이 부분은 실제 모델 구조를 확인하고 가장 적합한 모듈로 지정해야 합니다.
-    # 예: ["query_proj", "key_proj", "value_proj", "dense"] 또는 DeBERTa V2/V3의 일반적인 어텐션/MLP 레이어 이름
-    # 정확한 모듈명은 학습 스크립트의 LoraConfig와 동일해야 합니다.
-    # 예시 (학습 스크립트와 동일하게 맞춰야 함, 아래는 일반적인 예시일 뿐임):
-    deberta_target_modules = ["query_proj", "key_proj", "value_proj", "dense", "attention.self.query_layer", "attention.self.key_layer", "attention.self.value_layer", "intermediate.dense", "output.dense"]
-    # 실제 사용된 target_modules를 확인하고 적용해야 합니다. config.yaml에 저장해두는 것이 좋습니다.
-    # 학습 시 target_modules를 지정하지 않았다면, PEFT가 자동으로 선택한 모듈을 알아내거나,
-    # 일반적인 DeBERTa LoRA 타겟 모듈을 사용해야 합니다.
-    # 가장 안전한 방법은 학습 스크립트의 LoraConfig와 동일하게 설정하는 것입니다.
-    # 지금은 학습 스크립트에 target_modules가 없으므로, 일반적인 DeBERTa용 LoRA 타겟을 임시로 추가합니다.
-    # 하지만 이 부분은 실제 학습에 사용된 (또는 사용될) 모듈과 일치해야 합니다.
-    # 예를 들어, DeBERTa v3의 경우 다음이 일반적입니다.
-    default_deberta_lora_targets = ["query_proj", "key_proj", "value_proj", "intermediate.dense", "output.dense", "attention.output.dense"]
-
-
+    # 3. LoRA 설정
     lora_config = LoraConfig(
         task_type=TaskType.SEQ_CLS,
         r=cfg['deberta']['lora_r'],
         lora_alpha=cfg['deberta']['lora_alpha'],
-        # target_modules 지정 필수! 학습 시 사용된 모듈과 동일하게!
-        # 만약 학습 때 명시하지 않았다면, 여기서라도 적절한 값을 찾아야 함.
-        # print(base_model) 로 모델 구조를 확인하여 Linear 레이어 이름을 찾아야 합니다.
-        target_modules=cfg['deberta'].get('lora_target_modules', default_deberta_lora_targets) # config.yaml에 lora_target_modules 추가 권장
+        lora_dropout=0.05,  # 드롭아웃 추가
+        bias="none",        # 명시적 bias 설정
+        target_modules=["query_proj", "key_proj", "value_proj", "dense"]
     )
 
-    # 4. PEFT 모델 구성
-    model = get_peft_model(base_model, lora_config)
-    utils.log("PEFT 모델 구성 완료 (추론용)")
-
-    # 5. 학습된 가중치 로드
+    # 4. 모델 구성 및 가중치 로드 - 개선된 예외 처리
+    model = None
+    # 먼저 어댑터 방식으로 저장된 모델 체크
+    adapter_path = os.path.join(cfg['checkpoint_dir'], 'deberta_adapter')
     ckpt_path = os.path.join(cfg['checkpoint_dir'], 'deberta.pt')
-    if os.path.exists(ckpt_path):
-        utils.log(f"체크포인트 로드 중: {ckpt_path}")
-        try:
-            model.load_state_dict(torch.load(ckpt_path, map_location='cpu'), strict=False) # strict=False 시도
-            utils.log("state_dict 로드 성공.")
-        except RuntimeError as e:
-            utils.log(f"state_dict 로드 중 오류 발생: {e}. 저장 방식과 로드 방식을 확인하세요.", level="ERROR")
-            # 어댑터만 저장한 경우의 로드 방식 (참고용)
-            # model = PeftModel.from_pretrained(base_model, ckpt_path_directory) # ckpt_path가 디렉토리일 경우
-            raise FileNotFoundError(f"체크포인트 파일 로드에 실패했습니다: {ckpt_path}")
-
-    else:
-        utils.log(f"체크포인트 파일이 없습니다: {ckpt_path}. 사전 학습된 모델 가중치를 사용합니다.", level="WARNING")
-        # raise FileNotFoundError(f"체크포인트 파일이 없습니다: {ckpt_path}") # 필요시 에러 발생
+    
+    try:
+        if os.path.exists(adapter_path):
+            utils.log(f"어댑터 형식 체크포인트 로드 중: {adapter_path}")
+            model = PeftModel.from_pretrained(base_model, adapter_path)
+            utils.log("어댑터 로드 성공")
+        elif os.path.exists(ckpt_path):
+            utils.log(f"state_dict 체크포인트 로드 중: {ckpt_path}")
+            model = get_peft_model(base_model, lora_config)
+            model.load_state_dict(torch.load(ckpt_path, map_location='cpu'), strict=False)
+            utils.log("state_dict 로드 성공")
+        else:
+            utils.log(f"체크포인트 파일을 찾을 수 없음. 기본 모델로 진행", level="WARNING")
+            model = get_peft_model(base_model, lora_config)
+    except Exception as e:
+        utils.log(f"모델 로드 중 오류: {e}. 기본 모델로 진행", level="ERROR")
+        model = get_peft_model(base_model, lora_config)
 
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    utils.log(f"추론 디바이스: {DEVICE}")
     model.to(DEVICE)
-    model.eval() # 평가 모드로 설정
+    model.eval()
 
-    # 텍스트 NULL 값 체크 및 정제
+    # 텍스트 처리
     cleaned_texts = []
     for t in texts:
         if pd.isna(t):
-            cleaned_texts.append("") # 또는 적절한 기본값
-            utils.log("입력 텍스트 중 NaN 값을 빈 문자열로 처리했습니다.", level="WARNING")
+            cleaned_texts.append("")
+            utils.log("NaN 텍스트를 빈 문자열로 처리", level="WARNING")
         else:
-            cleaned_texts.append(utils.clean_text(str(t))) # cfg 전달
+            cleaned_texts.append(utils.clean_text(str(t)))
 
     results = []
-    # config.yaml에 deberta_infer 배치 크기 설정 권장
-    batch_size = cfg.get('batch_size', {}).get('deberta_infer', cfg.get('batch_size', {}).get('deberta', 32))
+    batch_size = cfg.get('batch_size', {}).get('deberta_infer', 32)
 
+    for i in tqdm(range(0, len(cleaned_texts), batch_size), desc=f"{model_id} 추론"):
+        batch_texts = cleaned_texts[i:i+batch_size]
+        encs = tok(batch_texts, truncation=True, padding='max_length',
+                   max_length=cfg['max_length'], return_tensors='pt')
 
-    num_batches = (len(cleaned_texts) + batch_size - 1) // batch_size
-    utils.log(f"{model_id} 추론 시작 (총 {len(cleaned_texts)}개, {num_batches}개 배치)")
+        # 디바이스로 이동
+        input_ids = encs.input_ids.to(DEVICE)
+        attention_mask = encs.attention_mask.to(DEVICE)
+        token_type_ids = encs.token_type_ids.to(DEVICE) if 'token_type_ids' in encs else None
 
-    with torch.no_grad():
-        for i in tqdm(range(0, len(cleaned_texts), batch_size), desc=f"{model_id} 추론"):
-            batch_texts = cleaned_texts[i:i+batch_size]
-            encs = tok(batch_texts, truncation=True, padding='max_length',
-                       max_length=cfg['max_length'], return_tensors='pt')
+        model_inputs = {'input_ids': input_ids, 'attention_mask': attention_mask}
+        if token_type_ids is not None:
+            model_inputs['token_type_ids'] = token_type_ids
 
-            # 생성된 텐서를 DEVICE로 이동
-            input_ids = encs.input_ids.to(DEVICE)
-            attention_mask = encs.attention_mask.to(DEVICE)
-            # DeBERTa는 token_type_ids를 사용할 수 있음 (없어도 동작은 함)
-            token_type_ids = encs.token_type_ids.to(DEVICE) if 'token_type_ids' in encs else None
-
-            model_inputs = {'input_ids': input_ids, 'attention_mask': attention_mask}
-            if token_type_ids is not None:
-                model_inputs['token_type_ids'] = token_type_ids
-
+        with torch.no_grad():
             outs = model(**model_inputs)
-            # probs = torch.softmax(outs.logits, dim=-1)[:, 1].cpu().numpy() # label 1일 확률
-            # 모델이 (batch_size, num_labels) 형태의 로짓을 반환한다고 가정
-            # 가짜일 확률 (label 1)을 가져옵니다.
             probs = torch.softmax(outs.logits, dim=1)[:, 1].detach().cpu().numpy()
             results.extend(probs)
 
     utils.log(f"{model_id} 추론 완료")
     return np.array(results)
+
 # ---------------- main 함수 ----------------
 def main():
-    # 설정 로드
     cfg = utils.load_config()
-    
     try:
-        # 로깅 초기화
         utils.init_logging(cfg)
-        
-        # 시드 설정
         utils.set_seed(cfg['seed'])
-        
-        # 학습 실행
         start_time = time.time()
         train_deberta(cfg)
         utils.log(f"DeBERTa-v3-Large LoRA 학습 완료 (총 소요시간: {utils.format_time(time.time() - start_time)})", is_important=True)
@@ -361,8 +341,7 @@ def main():
         import traceback
         utils.log(f"상세 오류: {traceback.format_exc()}", level="ERROR")
     finally:
-        # 로깅 자원 정리
         utils.close_logging()
 
 if __name__ == '__main__':
-    main() 
+    main()

@@ -10,9 +10,12 @@ torch>=1.13.0
 transformers>=4.42.0
 peft>=0.4.0
 bitsandbytes>=0.41.0
-sentencepiece
-protobuf
-tiktoken
+accelerate>=0.21.0
+trl>=0.4.7           # Qwen3 SFTTrainer에 필수
+datasets>=2.12.0     # Huggingface 데이터셋 처리에 필요
+sentencepiece        # 토큰화에 필요
+protobuf             # 모델 직렬화에 필요
+tiktoken             # 토큰 카운팅에 필요
 
 # 텍스트 처리/유틸
 tqdm>=4.62.0
@@ -24,13 +27,9 @@ kenlm
 # 하이퍼파라미터 튜닝
 optuna>=3.0.0
 
-# 기타(윈도우 호환, 경고 방지 등)
-accelerate>=0.21.0
-
-# (선택) wandb, matplotlib 등 실험 관리/시각화
-# wandb>=0.15.0
-# matplotlib>=3.5.0
-
+# 환경 및 설정
 python-dotenv>=1.0.0
 
-pip install --upgrade transformers peft accelerate bitsandbytes
+# (선택) 실험 추적/관리
+# wandb>=0.15.0
+# matplotlib>=3.5.0
