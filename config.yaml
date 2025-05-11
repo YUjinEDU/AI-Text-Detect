@@ -11,10 +11,10 @@ result_csv: submission.csv  # 상대 경로로 변경
 seed: 42
 max_length: 256  # nan 방지: 너무 길지 않게
 batch_size:
-  mistral: 4
+  mistral: 1
   mistral_infer: 16 # Mistral/Qwen 추론용 배치 크기
-  deberta: 16
-  deberta_infer: 32 # DeBERTa 추론용 배치 크기
+  deberta: 1
+  deberta_infer: 16 # DeBERTa 추론용 배치 크기
 
 # 진행 상황 및 로깅
 logging:
@@ -32,14 +32,15 @@ data_preprocessing:
 # Mistral‑7B QLoRA
 mistral:
   model_id: Qwen/Qwen3-4B
-  lora_r: 16
-  lora_alpha: 32
-  lr: 5.0e-7   # nan 방지: 더 낮은 학습률
+  lora_r: 32
+  lora_alpha: 64
+  lora_dropout: 0.05
+  lr: 1.0e-4   # nan 방지: 더 낮은 학습률
   epochs: 3
   quant:
     load_in_4bit: true
     quant_type: nf4
-    double_quant: true
+    double_quant: false
 
 # DeBERTa‑v3‑Large LoRA
 deberta:

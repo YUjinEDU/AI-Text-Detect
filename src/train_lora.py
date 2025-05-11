@@ -95,33 +95,119 @@ def train_lora(cfg, epochs=None, batch_size=None, lr=None):
     def make_target(label):
         return ("네" if label == 1 else "아니오").strip()
 
+# In train_lora.py QwenDataset class
+
     class QwenDataset(Dataset):
         def __init__(self, df, aug=False):
             self.df, self.aug = df, aug
+            # self.tok는 외부에서 초기화된 tok 변수를 사용하도록 변경 (클래스 멤버로 저장)
+            # 또는 train_lora 함수 내에서 tok을 이 클래스 생성자에 전달
+            # 예: train_dl = DataLoader(QwenDataset(train_df, tok=tok, aug=True), ...)
+            # 여기서는 train_lora 함수 스코프의 tok을 직접 참조한다고 가정
+
         def __len__(self): return len(self.df)
         def __getitem__(self, idx):
             t = self.df.iloc[idx]['text']
+            label_val = self.df.iloc[idx]['label'] # 라벨 값 가져오기
+
             if self.aug and cfg['augment']['enable'] and random.random() < cfg['augment']['p_noise']:
                 t = utils.noise_text(t, mask_ratio=cfg['augment']['mask_ratio'], swap_ratio=cfg['augment']['swapcase_ratio'])
-            prompt = make_prompt(t)
-            target = make_target(self.df.iloc[idx]['label'])
-            full = prompt + " " + target
-            enc = tok(full, truncation=True, padding='max_length', max_length=cfg['max_length'], return_tensors='pt')
+
+            prompt = make_prompt(t) # "이 문장이 가짜인가요? {text}\n정답:"
+            target = make_target(label_val) # "네" 또는 "아니오"
+
+            full_text_for_input_ids = prompt + " " + target # 모델 입력으로 사용될 전체 텍스트
+
+            # 1. 입력 ID 및 어텐션 마스크 생성 (전체 텍스트 기준, max_length로 패딩/자르기)
+            # padding_side='left'가 토크나이저에 설정되어 있어야 함
+            enc = tok(
+                full_text_for_input_ids,
+                truncation=True,
+                padding='max_length',
+                max_length=cfg['max_length'],
+                return_tensors='pt'
+            )
             input_ids = enc.input_ids.squeeze(0)
+            attention_mask = enc.attention_mask.squeeze(0)
+
+            # 2. 레이블 생성: input_ids를 복사한 후, 프롬프트 부분과 패딩 부분을 -100으로 마스킹
             labels = input_ids.clone()
-            # 프롬프트 부분은 -100으로 마스킹
-            prompt_enc = tok(prompt, truncation=True, padding='max_length', max_length=cfg['max_length'], return_tensors='pt')
-            prompt_len = (prompt_enc.input_ids.squeeze(0) != tok.pad_token_id).sum().item()
-            labels[:prompt_len] = -100
+
+            # 2a. 프롬프트 부분 마스킹:
+            #       prompt 텍스트를 토큰화하여 실제 프롬프트 토큰 길이를 구함 (패딩/자르기 없이)
+            #       주의: tok(prompt)와 tok(full_text_for_input_ids)에서 prompt 부분의 토큰화 결과가 다를 수 있음 (앞뒤 문맥)
+            #       가장 안전한 방법은 prompt + " " 부분까지의 길이를 기준으로 하는 것.
+            #       또는, target 이전까지를 모두 프롬프로 간주.
+            #       여기서는 "prompt + 공백" 까지의 길이를 기준으로 마스킹 시도.
+            prompt_with_space = prompt + " "
+            # input_ids에서 prompt_with_space가 끝나는 지점을 찾아야 함.
+            # 이는 쉽지 않으므로, target 텍스트가 시작되는 지점을 찾는 것이 더 나을 수 있음.
+            # target 텍스트 ("네" 또는 "아니오") 토큰 ID를 찾아서 그 이전까지를 -100으로 마스킹.
+
+            # 더 간단하고 일반적인 방법: 응답(target) 부분만 레이블로 남기고 나머지는 -100
+            # "네" 또는 "아니오" 라는 짧은 응답을 예측하는 것이므로,
+            # 전체 input_ids에서 마지막 몇 개의 토큰(응답 부분)만 레이블로 남깁니다.
+            # 먼저, 프롬프트 부분의 길이를 (패딩/자르기 없는) 실제 토큰 수로 계산
+            prompt_tokens = tok(prompt, add_special_tokens=False, truncation=False).input_ids
+            len_prompt_tokens = len(prompt_tokens)
+
+            # 레이블에서 프롬프트 부분은 모두 -100으로 마스킹
+            # input_ids는 padding_side='left'이므로 프롬프트는 오른쪽에 있을 수 있음.
+            # 토크나이저에 padding_side='left'가 잘 적용되었다면, 실제 내용은 오른쪽에 정렬됨.
+            # | PAD PAD ... PAD | Prompt Text | Target Text |
+            # 이 경우, 실제 내용 시작점부터 len_prompt_tokens 만큼이 프롬프트.
+
+            # 실제 내용(non-pad)의 시작 인덱스 찾기
+            if tok.padding_side == 'left':
+                try:
+                    first_real_token_idx = (input_ids != tok.pad_token_id).nonzero(as_tuple=True)[0][0].item()
+                except IndexError: # 모두 패딩 토큰인 경우 (매우 짧은 입력)
+                    first_real_token_idx = cfg['max_length'] # 전체 마스킹 유도
+            else: # padding_side == 'right' (또는 기본값)
+                first_real_token_idx = 0
+
+            # 프롬프트 부분 마스킹
+            # 실제 프롬프트 토큰들이 위치하는 구간을 -100으로 설정
+            # 이 구간은 first_real_token_idx 부터 first_real_token_idx + len_prompt_tokens 까지.
+            prompt_mask_end_idx = min(first_real_token_idx + len_prompt_tokens, cfg['max_length'])
+            labels[first_real_token_idx:prompt_mask_end_idx] = -100
+
+            # 2b. 패딩 부분 마스킹:
+            #       input_ids에서 tok.pad_token_id인 부분을 모두 -100으로 마스킹
+            #       (위에서 프롬프트 마스킹 후에도 패딩 영역이 남아있을 수 있으므로, 확실하게 다시 마스킹)
+            labels[input_ids == tok.pad_token_id] = -100
+
+            # 디버깅 출력 (이전 답변의 디버깅 코드 활용)
+            if idx < 3: # 처음 3개 샘플에 대해 출력
+                print(f"\n--- QwenDataset Debugging Sample {idx} ---")
+                print(f"Raw Text: {self.df.iloc[idx]['text']}")
+                print(f"Label: {label_val}")
+                print(f"Prompt: {prompt}")
+                print(f"Target: {target}")
+                print(f"tokenizer.padding_side: {tok.padding_side}, tokenizer.pad_token_id: {tok.pad_token_id}")
+                print(f"Input IDs (shape {input_ids.shape}):\n{input_ids.tolist()}")
+                # print(f"Decoded Input IDs: {tok.decode(input_ids)}") # 전체 디코딩은 길 수 있음
+                print(f"Attention Mask (shape {attention_mask.shape}):\n{attention_mask.tolist()}")
+                print(f"Labels (shape {labels.shape}):\n{labels.tolist()}")
+                active_labels = labels[labels != -100]
+                print(f"Active Labels (tokens to predict, count {len(active_labels)}):\n{active_labels.tolist()}")
+                if len(active_labels) > 0:
+                    print(f"Decoded Active Labels: '{tok.decode(active_labels)}'")
+                else:
+                    print("Warning: No active labels found for this sample. All labels are -100.")
+                print("---------------------------------------\n")
+
+
+            # 모델은 input_ids와 attention_mask를 사용하고, labels와 비교하여 loss 계산
             return {
-                'input_ids': input_ids.to(DEVICE),
-                'attention_mask': enc.attention_mask.squeeze(0).to(DEVICE),
-                'labels': labels.to(DEVICE)
+                'input_ids': input_ids,    # .to(DEVICE) 제거
+                'attention_mask': attention_mask, # .to(DEVICE) 제거
+                'labels': labels          # .to(DEVICE) 제거
             }
 
     epochs = epochs or int(os.environ.get('EPOCHS', cfg['mistral']['epochs']))
     batch_size = batch_size or int(os.environ.get('BATCH_SIZE', cfg['batch_size']['mistral']))
-    lr = lr or float(os.environ.get('LR', 5e-6))
+    lr = lr or float(os.environ.get('LR', 1e-4))
     utils.log(f"하이퍼파라미터 설정: epochs={epochs}, batch_size={batch_size}, lr={lr:.1e}")
     utils.log("데이터로더 초기화 중...")
     train_dl = DataLoader(QwenDataset(train_df, aug=True), batch_size=batch_size, shuffle=True)
@@ -131,6 +217,10 @@ def train_lora(cfg, epochs=None, batch_size=None, lr=None):
 
     early = utils.EarlyStopping(patience=3, verbose=True)
     utils.log("학습 시작", is_important=True)
+    
+    # NaN/Inf 감지 기능 활성화 (디버깅용)
+    torch.autograd.set_detect_anomaly(True)
+    
     progress = utils.ProgressTracker(epochs, "Qwen3-4B QLoRA 학습")
     model.train()
     for epoch in range(epochs):
@@ -140,6 +230,11 @@ def train_lora(cfg, epochs=None, batch_size=None, lr=None):
         for b in train_progress:
             opt.zero_grad()
             out = model(**b)
+
+            if torch.isnan(out.logits).any() or torch.isinf(out.logits).any():
+                utils.log(f"[nan/inf in logits DETECTED] logits sample: {out.logits.flatten()[:20]}", level="ERROR")
+                # 문제가 되는 logits를 생성한 input_ids 등 로깅
+                # raise ValueError("NaN/Inf in model logits") # 여기서 중단하여 확인
             if torch.isnan(out.loss) or torch.isnan(out.logits).any():
                 utils.log(f"[nan 감지] loss: {out.loss}, logits: {out.logits}")
                 utils.log(f"[nan 감지] input_ids: {b['input_ids']}")
